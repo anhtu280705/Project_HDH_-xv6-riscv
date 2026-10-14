@@ -123,26 +123,22 @@ pop_off(void)
 void
 printlockstat(struct spinlock *lk)
 {
-  if(lk == 0)
+  if (lk == 0)
     return;
-  printk("lock %s: acquires=%d contended=%d\n", lk->name, lk->n_acquire, lk->n_contended);
+  printk("lock %s: acquires=%d contended=%d\n", lk->name, lk->n_acquire,
+         lk->n_contended);
 }
+
 extern struct spinlock wait_lock;
 extern struct spinlock pid_lock;
-extern struct {
-  struct spinlock lock;
-} kmem;
-extern struct proc proc[];
-
 void
 printalllockstat(void)
 {
-  printk("\n--- LOCK STATISTICS ---\n");
   printlockstat(&wait_lock);
   printlockstat(&pid_lock);
   printlockstat(&kmem.lock);
-  for(int i = 0; i < NPROC; i++) {
-    if(proc[i].lock.n_acquire > 0)
+  for (int i = 0; i < NPROC; i++) {
+    if (proc[i].lock.n_acquire > 0)
       printlockstat(&proc[i].lock);
   }
 }

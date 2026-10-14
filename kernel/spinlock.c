@@ -128,9 +128,13 @@ printlockstat(struct spinlock *lk)
   printk("lock %s: acquires=%d contended=%d\n", lk->name, lk->n_acquire,
          lk->n_contended);
 }
-
 extern struct spinlock wait_lock;
 extern struct spinlock pid_lock;
+extern struct {
+  struct spinlock lock;
+} kmem;
+extern struct proc proc[];
+
 void
 printalllockstat(void)
 {

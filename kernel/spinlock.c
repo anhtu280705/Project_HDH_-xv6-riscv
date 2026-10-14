@@ -14,6 +14,8 @@ initlock(struct spinlock *lk, char *name)
   lk->name = name;
   lk->locked = 0;
   lk->cpu = 0;
+  lk->n_acquire = 0;
+  lk->n_contended = 0;
 }
 
 // Acquire the lock.
@@ -24,6 +26,7 @@ acquire(struct spinlock *lk)
   push_off(); // disable interrupts to avoid deadlock.
   if (holding(lk))
     panic("acquire");
+  lk->n_acquire++;
 
   // On RISC-V, __atomic_exchange_n turns into an atomic swap:
   //   a5 = 1
@@ -34,8 +37,11 @@ acquire(struct spinlock *lk)
   // the C compiler and the processor to not move loads or stores
   // past this point, to ensure that the critical section's memory
   // references happen strictly after the lock is acquired.
-  while (__atomic_exchange_n(&lk->locked, 1, __ATOMIC_ACQUIRE) != 0)
-    ;
+  if (__atomic_exchange_n(&lk->locked, 1, __ATOMIC_ACQUIRE) != 0) {
+    lk->n_contended++;
+    while (__atomic_exchange_n(&lk->locked, 1, __ATOMIC_ACQUIRE) != 0)
+      ;
+  }
 
   // Record info about lock acquisition for holding() and debugging.
   lk->cpu = mycpu();
@@ -113,4 +119,30 @@ pop_off(void)
   c->noff -= 1;
   if (c->noff == 0 && c->intena)
     intr_on();
+}
+void
+printlockstat(struct spinlock *lk)
+{
+  if(lk == 0)
+    return;
+  printk("lock %s: acquires=%d contended=%d\n", lk->name, lk->n_acquire, lk->n_contended);
+}
+extern struct spinlock wait_lock;
+extern struct spinlock pid_lock;
+extern struct {
+  struct spinlock lock;
+} kmem;
+extern struct proc proc[];
+
+void
+printalllockstat(void)
+{
+  printk("\n--- LOCK STATISTICS ---\n");
+  printlockstat(&wait_lock);
+  printlockstat(&pid_lock);
+  printlockstat(&kmem.lock);
+  for(int i = 0; i < NPROC; i++) {
+    if(proc[i].lock.n_acquire > 0)
+      printlockstat(&proc[i].lock);
+  }
 }

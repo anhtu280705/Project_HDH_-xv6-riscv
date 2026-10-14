@@ -9,6 +9,7 @@ struct spinlock;
 struct sleeplock;
 struct stat;
 struct superblock;
+void            printf(char*, ...);
 
 // bio.c
 void            binit(void);
@@ -114,6 +115,8 @@ void            initlock(struct spinlock*, char*);
 void            release(struct spinlock*);
 void            push_off(void);
 void            pop_off(void);
+void            printlockstat(struct spinlock*);
+void            printalllockstat(void);
 
 // sleeplock.c
 void            acquiresleep(struct sleeplock*);

@@ -23,9 +23,7 @@ backtrace(void)
 
   printk("backtrace:\n");
 
-  while (fp >= stack_bottom + 16 &&
-         fp < stack_top &&
-         (fp & 7) == 0) {
+  while (fp >= stack_bottom + 16 && fp < stack_top && (fp & 7) == 0) {
     uint64 *frame = (uint64 *)fp;
     uint64 previous_fp = frame[-2];
     uint64 return_address = frame[-1];
@@ -45,14 +43,12 @@ backtrace(void)
 }
 
 // Controlled call chain for the first prototype test.
-__attribute__((noinline))
-static void
+__attribute__((noinline)) static void
 backtrace_level2(void)
 {
   backtrace();
 }
-__attribute__((noinline))
-static void
+__attribute__((noinline)) static void
 backtrace_level1(void)
 {
   backtrace_level2();

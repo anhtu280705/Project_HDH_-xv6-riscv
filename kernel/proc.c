@@ -325,7 +325,6 @@ reparent(struct proc *p)
 void
 kexit(int status)
 {
-  printalllockstat();
   struct proc *p = myproc();
 
   if (p == initproc)

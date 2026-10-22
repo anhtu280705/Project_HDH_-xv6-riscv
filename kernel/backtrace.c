@@ -59,3 +59,9 @@ backtrace_test(void)
 {
   backtrace_level1();
 }
+uint64
+sys_bttest(void)
+{
+  backtrace_test();
+  return 0;
+}

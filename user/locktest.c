@@ -2,15 +2,15 @@
 #include "kernel/stat.h"
 #include "user/user.h"
 
-int main(int argc, char *argv[]) {
+int
+main(int argc, char *argv[])
+{
   printf("Bat dau chay test contention...\n");
-  
   int pid = fork();
   if (pid < 0) {
     printf("locktest: FAIL (fork failed)\n");
     exit(1);
   }
-  
   if (pid == 0) {
     // Tien trinh con chay vong lap tao tai thay vi dung sleep
     volatile int dummy = 0;
@@ -25,6 +25,5 @@ int main(int argc, char *argv[]) {
     lockstat();
     printf("locktest: PASS\n");
   }
-
   exit(0);
 }

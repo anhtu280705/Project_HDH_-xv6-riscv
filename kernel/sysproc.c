@@ -110,3 +110,11 @@ sys_uptime(void)
   release(&tickslock);
   return xticks;
 }
+extern void printalllockstat(void);
+
+uint64
+sys_lockstat(void)
+{
+  printalllockstat();
+  return 0;
+}

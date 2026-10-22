@@ -21,7 +21,7 @@
 #include "riscv.h"
 #include "defs.h"
 #include "proc.h"
-
+extern void printalllockstat(void);
 #define BACKSPACE 0x100       // erase the last output character
 #define C(x)      ((x) - '@') // Control-x
 
@@ -151,6 +151,9 @@ consoleintr(int c)
   switch (c) {
   case C('P'): // Print process list.
     procdump();
+    break;
+  case C('L'): // In thong ke khoa
+    printalllockstat();
     break;
   case C('U'): // Kill line.
     while (cons.e != cons.w &&

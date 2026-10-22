@@ -22,6 +22,7 @@ int main(int argc, char *argv[]) {
     // Tiến trình cha chờ con chạy xong
     int status;
     wait(&status);
+    lockstat();
     printf("locktest: PASS\n");
   }
   

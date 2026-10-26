@@ -110,3 +110,15 @@ sys_uptime(void)
   release(&tickslock);
   return xticks;
 }
+
+uint64
+sys_kprof(void)
+{
+  int cmd;
+  uint64 uarg;
+
+  argint(0, &cmd);
+  argaddr(1, &uarg);
+
+  return kprof_control(cmd, uarg);
+}

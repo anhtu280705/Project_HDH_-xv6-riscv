@@ -11,6 +11,7 @@ OBJS = \
   $K/spinlock.o \
   $K/string.o \
   $K/main.o \
+  $K/kprof.o \
   $K/vm.o \
   $K/proc.o \
   $K/swtch.o \
@@ -151,6 +152,7 @@ UPROGS=\
 	$U/_forphan\
 	$U/_dorphan\
 	$U/_sync\
+	$U/_kprof\
 
 fs.img: mkfs/mkfs README $(UPROGS)
 	mkfs/mkfs fs.img README $(UPROGS)

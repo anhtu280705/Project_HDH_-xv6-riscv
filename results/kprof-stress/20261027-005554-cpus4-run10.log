@@ -1,0 +1,28 @@
+# cmd=kproftest cpus=4 status=DONE elapsed=19.3s
+qemu-system-riscv64 -machine virt -bios none -kernel kernel/kernel -m 128M -smp 4 -nographic -global virtio-mmio.force-legacy=false -drive file=fs.img,if=none,format=raw,id=x0 -device virtio-blk-device,drive=x0,bus=virtio-mmio-bus.0
+
+xv6 kernel is booting
+
+hart 2 starting
+hart 3 starting
+hart 1 starting
+init: starting sh
+$ kproftest
+KP01 PASS off_no_samples
+KP02 PASS start_collects
+KP03 PASS stop_freezes
+KP04 PASS reset_contract
+KP05 PASS repeat_start_stop
+    kernel loop [0x0000000080000ECA,0x0000000080000EE8): 30 of 30 own kernel ticks (90 idle)
+KP06 PASS kernel_hot_loop
+    user loop [0x0000000000000008,0x000000000000001A): 26 of 27 own user ticks (27 user total)
+KP06b PASS user_hot_loop
+KP07 PASS pc_classification
+KP08 PASS snapshot_while_sampling
+KP09 PASS buffer_overflow_dropped
+KP10 PASS bad_args
+    child pid 5: 19 of 19 user ticks
+KP11 PASS pid_attribution
+kproftest: 12/12 PASS
+kproftest: DONE
+$ 

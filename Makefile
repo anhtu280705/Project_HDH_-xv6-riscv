@@ -66,6 +66,12 @@ DETFLAGS = -ffile-prefix-map=$(CURDIR)=.
 
 CFLAGS = -Wall -Werror -Wno-unknown-attributes -O -fno-omit-frame-pointer -ggdb -gdwarf-2
 CFLAGS += $(DETFLAGS)
+# kprof test-only hooks (TEST_SPIN/TEST_SETCAP). Default on for the course
+# build; use `make clean && make KPROF_TEST=0 ...` for a hook-free kernel.
+KPROF_TEST ?= 1
+ifeq ($(KPROF_TEST),1)
+CFLAGS += -DKPROF_TEST_HOOKS
+endif
 CFLAGS += -march=rv64gc
 CFLAGS += -std=gnu99
 CFLAGS += -MD
@@ -153,6 +159,8 @@ UPROGS=\
 	$U/_dorphan\
 	$U/_sync\
 	$U/_kprof\
+	$U/_kproftest\
+	$U/_kbench\
 
 fs.img: mkfs/mkfs README $(UPROGS)
 	mkfs/mkfs fs.img README $(UPROGS)

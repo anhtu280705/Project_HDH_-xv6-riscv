@@ -185,7 +185,7 @@ void            virtio_disk_intr(void);
 // kprof.c
 void            kprofinit(void);
 void            kprof_sample(uint64, int);
-int             kprof_control(int, uint64);
+int             kprof_control(int, uint64, int);
 
 // number of elements in fixed-size array
 #define NELEM(x) (sizeof(x) / sizeof((x)[0]))

@@ -114,11 +114,12 @@ sys_uptime(void)
 uint64
 sys_kprof(void)
 {
-  int cmd;
-  uint64 uarg;
+  int cmd, cap;
+  uint64 buf;
 
   argint(0, &cmd);
-  argaddr(1, &uarg);
+  argaddr(1, &buf);
+  argint(2, &cap);
 
-  return kprof_control(cmd, uarg);
+  return kprof_control(cmd, buf, cap);
 }

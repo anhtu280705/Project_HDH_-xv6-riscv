@@ -1,0 +1,13 @@
+cpus,workload,config,n,mean,stdev,min,max,overhead_pct_vs_stock
+1,cpu 500,stock,5,10.00,0.00,10,10,0.0
+1,cpu 500,prof-off,5,10.20,0.45,10,11,2.0
+1,cpu 500,prof-on,5,10.40,0.55,10,11,4.0
+1,sys 50,stock,5,6.80,0.45,6,7,0.0
+1,sys 50,prof-off,5,6.60,0.55,6,7,-2.9
+1,sys 50,prof-on,5,6.60,0.55,6,7,-2.9
+4,cpu 500,stock,5,9.80,0.45,9,10,0.0
+4,cpu 500,prof-off,5,9.40,0.55,9,10,-4.1
+4,cpu 500,prof-on,5,9.00,0.00,9,9,-8.2
+4,sys 50,stock,5,6.80,0.45,6,7,0.0
+4,sys 50,prof-off,5,7.00,0.00,7,7,2.9
+4,sys 50,prof-on,5,6.00,0.00,6,6,-11.8

@@ -8,6 +8,11 @@
 #include "proc.h"
 #include "defs.h"
 
+// Lock registry toan cuc
+#define MAX_REG_LOCKS 128
+struct spinlock *lock_registry[MAX_REG_LOCKS];
+int n_reg_locks = 0;
+
 void
 initlock(struct spinlock *lk, char *name)
 {
@@ -17,6 +22,10 @@ initlock(struct spinlock *lk, char *name)
   lk->acquisitions = 0;
   lk->contended_acquisitions = 0;
   lk->failed_attempts = 0;
+
+  if (n_reg_locks < MAX_REG_LOCKS) {
+    lock_registry[n_reg_locks++] = lk;
+  }
 }
 
 // Acquire the lock.

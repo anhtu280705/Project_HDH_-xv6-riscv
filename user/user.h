@@ -25,7 +25,8 @@ char *sys_sbrk(int, int);
 int pause(int);
 int uptime(void);
 int sync(void);
-int lockstat(void);
+struct lockstat;
+int lockstat(struct lockstat *, int);
 
 // ulib.c
 int stat(const char *, struct stat *);

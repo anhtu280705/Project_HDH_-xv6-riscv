@@ -112,9 +112,39 @@ sys_uptime(void)
 }
 extern void printalllockstat(void);
 
+#define MAX_REG_LOCKS 128
+extern struct spinlock *lock_registry[MAX_REG_LOCKS];
+extern int n_reg_locks;
+
 uint64
 sys_lockstat(void)
 {
-  printalllockstat();
-  return 0;
+  uint64 addr;
+  int max;
+  argaddr(0, &addr);
+  argint(1, &max);
+
+  struct proc *p = myproc();
+  struct lockstat ls;
+  int count = 0;
+
+  for (int i = 0; i < n_reg_locks && count < max; i++) {
+    struct spinlock *lk = lock_registry[i];
+    if (lk == 0)
+      continue;
+
+    if (lk->acquisitions > 0) {
+      safestrcpy(ls.name, lk->name ? lk->name : "unnamed", sizeof(ls.name));
+      ls.acquisitions = lk->acquisitions;
+      ls.contended_acquisitions = lk->contended_acquisitions;
+      ls.failed_attempts = lk->failed_attempts;
+
+      if (copyout(p->pagetable, p->sz, addr + count * sizeof(struct lockstat),
+                  (char *)&ls, sizeof(ls)) < 0) {
+        return -1;
+      }
+      count++;
+    }
+  }
+  return count;
 }

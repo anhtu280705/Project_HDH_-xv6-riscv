@@ -1,0 +1,30 @@
+name: Lockstat CI
+
+on:
+  push:
+    branches: [ feature/lockstat, main ]
+  pull_request:
+    branches: [ feature/lockstat, main ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Install RISC-V Toolchain and QEMU
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y gcc-riscv64-linux-gnu binutils-riscv64-linux-gnu qemu-system-misc clang-format python3
+
+    - name: Check Code Formatting
+      run: |
+        make fmt
+        git diff --exit-code
+
+    - name: Run Lockstat Automated Test
+      run: |
+        chmod +x test_runner.sh
+        ./test_runner.sh

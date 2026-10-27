@@ -14,8 +14,9 @@ initlock(struct spinlock *lk, char *name)
   lk->name = name;
   lk->locked = 0;
   lk->cpu = 0;
-  lk->n_acquire = 0;
-  lk->n_contended = 0;
+  lk->acquisitions = 0;
+  lk->contended_acquisitions = 0;
+  lk->failed_attempts = 0;
 }
 
 // Acquire the lock.
@@ -26,24 +27,27 @@ acquire(struct spinlock *lk)
   push_off(); // disable interrupts to avoid deadlock.
   if (holding(lk))
     panic("acquire");
-  lk->n_acquire++;
 
-  // On RISC-V, __atomic_exchange_n turns into an atomic swap:
-  //   a5 = 1
-  //   s1 = &lk->locked
-  //   amoswap.w.aq a5, a5, (s1)
-  //
-  // Passing __ATOMIC_ACQUIRE to __atomic_exchange_n tells
-  // the C compiler and the processor to not move loads or stores
-  // past this point, to ensure that the critical section's memory
-  // references happen strictly after the lock is acquired.
-  if (__atomic_exchange_n(&lk->locked, 1, __ATOMIC_ACQUIRE) != 0) {
-    lk->n_contended++;
-    while (__atomic_exchange_n(&lk->locked, 1, __ATOMIC_ACQUIRE) != 0)
-      ;
+  int contended = 0;
+
+  // Vòng lặp spin chờ lock
+  while (__sync_lock_test_and_set(&lk->locked, 1) != 0) {
+    // Đếm số vòng spin bị trượt bằng hàm atomic
+    __sync_fetch_and_add(&lk->failed_attempts, 1);
+    contended = 1;
   }
 
-  // Record info about lock acquisition for holding() and debugging.
+  // Tăng số lần bị tranh chấp nếu phải chờ
+  if (contended) {
+    __sync_fetch_and_add(&lk->contended_acquisitions, 1);
+  }
+
+  // Luồng hiện tại đã giữ lock độc quyền, cộng trực tiếp an toàn tuyệt đối
+  lk->acquisitions++;
+
+  // Tell the C compiler and the processor to not move loads or stores...
+  __sync_synchronize();
+
   lk->cpu = mycpu();
 }
 
@@ -123,10 +127,8 @@ pop_off(void)
 void
 printlockstat(struct spinlock *lk)
 {
-  if (lk == 0)
-    return;
-  printk("lock %s: acquires=%d contended=%d\n", lk->name, lk->n_acquire,
-         lk->n_contended);
+  printk("lock %s: acquires=%d contended=%d failed=%d\n", lk->name,
+         lk->acquisitions, lk->contended_acquisitions, lk->failed_attempts);
 }
 extern struct spinlock wait_lock;
 extern struct spinlock pid_lock;
@@ -142,7 +144,7 @@ printalllockstat(void)
   printlockstat(&pid_lock);
   printlockstat(&kmem.lock);
   for (int i = 0; i < NPROC; i++) {
-    if (proc[i].lock.n_acquire > 0)
+    if (proc[i].lock.acquisitions > 0)
       printlockstat(&proc[i].lock);
   }
 }

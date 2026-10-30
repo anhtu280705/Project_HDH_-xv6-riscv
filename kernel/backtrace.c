@@ -63,5 +63,11 @@ uint64
 sys_bttest(void)
 {
   backtrace_test();
+
+  if (ksym_test() < 0)
+    printk("ksym_test: FAIL\n");
+  else
+    printk("ksym_test: PASS\n");
+
   return 0;
 }

@@ -36,9 +36,15 @@ SECTIONS
 
   .bss : {
     . = ALIGN(16);
-    *(.sbss .sbss.*) /* do not need to distinguish this from .bss */
+    *(.sbss .sbss.*)
     . = ALIGN(16);
     *(.bss .bss.*)
+  }
+
+  /* Kernel symbol table */
+  .ksym : {
+    . = ALIGN(16);
+    *(.ksym)
   }
 
   PROVIDE(end = .);

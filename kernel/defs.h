@@ -187,3 +187,5 @@ void            virtio_disk_intr(void);
 void backtrace(void);
 void backtrace_test(void);
 uint64 sys_bttest(void);
+int ksym_lookup(uint64 addr, const char **name, uint64 *offset);
+int ksym_test(void);

@@ -12,6 +12,7 @@ OBJS = \
   $K/string.o \
   $K/main.o \
   $K/backtrace.o \
+  $K/ksym.o \
   $K/vm.o \
   $K/proc.o \
   $K/swtch.o \
@@ -91,8 +92,23 @@ endif
 
 LDFLAGS = -z max-page-size=4096
 
-$K/kernel: $(OBJS) $K/kernel.ld
-	$(LD) $(LDFLAGS) -T $K/kernel.ld -o $K/kernel $(OBJS) 
+$K/ksymtab_stub.o: $K/ksymtab_stub.S
+	$(CC) -march=rv64gc -g $(DETFLAGS) -c -o $@ $<
+
+$K/kernel.base: $(OBJS) $K/ksymtab_stub.o $K/kernel.ld
+	$(LD) $(LDFLAGS) -T $K/kernel.ld -o $@ $(OBJS) $K/ksymtab_stub.o
+
+# Generate the real symbol table from the temporary kernel.
+$K/ksymtab.S: $K/kernel.base tools/gen_ksym.py
+	python3 tools/gen_ksym.py $K/kernel.base -o $@
+
+# Compile the generated symbol table.
+$K/ksymtab.o: $K/ksymtab.S
+	$(CC) -march=rv64gc -g $(DETFLAGS) -c -o $@ $<
+
+# Final link: use the real symbol table, not the stub.
+$K/kernel: $(OBJS) $K/ksymtab.o $K/kernel.ld
+	$(LD) $(LDFLAGS) -T $K/kernel.ld -o $@ $(OBJS) $K/ksymtab.o
 	$(OBJDUMP) -S $K/kernel > $K/kernel.asm
 	$(OBJDUMP) -t $K/kernel | sed '1,/SYMBOL TABLE/d; s/ .* / /; /^$$/d' > $K/kernel.sym
 
@@ -161,7 +177,7 @@ fs.img: mkfs/mkfs README $(UPROGS)
 clean:
 	rm -f *.tex *.dvi *.idx *.aux *.log *.ind *.ilg \
 	*/*.o */*.d */*.asm */*.sym \
-	$K/kernel fs.img \
+	$K/kernel $K/kernel.base $K/ksymtab.S fs.img \
 	mkfs/mkfs .gdbinit \
         $U/usys.S \
 	$(UPROGS)

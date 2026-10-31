@@ -59,15 +59,11 @@ ksym_test(void)
   if (name == 0)
     return -1;
 
-  if (name[0] != 'b' || name[1] != 'a' ||
-    name[2] != 'c' || name[3] != 'k' ||
-    name[4] != 't' || name[5] != 'r' ||
-    name[6] != 'a' || name[7] != 'c' ||
-    name[8] != 'e' || name[9] != '_' ||
-    name[10] != 't' || name[11] != 'e' ||
-    name[12] != 's' || name[13] != 't' ||
-    name[14] != '\0')
-  return -1;
+  if (name[0] != 'b' || name[1] != 'a' || name[2] != 'c' || name[3] != 'k' ||
+      name[4] != 't' || name[5] != 'r' || name[6] != 'a' || name[7] != 'c' ||
+      name[8] != 'e' || name[9] != '_' || name[10] != 't' || name[11] != 'e' ||
+      name[12] != 's' || name[13] != 't' || name[14] != '\0')
+    return -1;
 
   // Test an address outside all function symbols.
   if (ksym_lookup(0, &name, &offset) == 0)

@@ -32,7 +32,7 @@ backtrace(void)
     if (return_address == 0)
       break;
 
-        if (ksym_lookup(return_address - 1, &name, &offset) == 0) {
+    if (ksym_lookup(return_address - 1, &name, &offset) == 0) {
       printk("  %s+0x%lx\n", (char *)name, offset);
     } else {
       printk("  ra=%p (unknown)\n", (void *)return_address);

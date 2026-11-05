@@ -4,6 +4,7 @@
 
 extern struct ksym ksym_table[];
 extern uint64 ksym_count;
+extern void backtrace_test(void);
 
 int
 ksym_lookup(uint64 addr, const char **name, uint64 *offset)
@@ -51,9 +52,9 @@ ksym_test(void)
 {
   const char *name;
   uint64 offset;
-
+  uint64 addr = (uint64)backtrace_test;
   // Test an address inside backtrace_test.
-  if (ksym_lookup(0x80000f50, &name, &offset) < 0)
+  if (ksym_lookup(addr, &name, &offset) < 0)
     return -1;
 
   if (name == 0)

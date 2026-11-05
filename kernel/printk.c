@@ -140,6 +140,10 @@ panic(char *s)
   panicking = 1;
   printk("panic: ");
   printk("%s\n", s);
+
+  printk("Kernel backtrace:\n");
+  backtrace();
+
   panicked = 1; // freeze uart output from other CPUs
   for (;;)
     ;

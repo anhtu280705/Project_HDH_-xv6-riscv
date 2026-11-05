@@ -20,7 +20,8 @@ backtrace(void)
   uint64 fp = read_fp();
   uint64 stack_bottom = r_sp() & ~(PGSIZE - 1);
   uint64 stack_top = stack_bottom + PGSIZE;
-
+  const char *name;
+  uint64 offset;
   printk("backtrace:\n");
 
   while (fp >= stack_bottom + 16 && fp < stack_top && (fp & 7) == 0) {
@@ -31,7 +32,11 @@ backtrace(void)
     if (return_address == 0)
       break;
 
-    printk("  ra=%p\n", (void *)return_address);
+        if (ksym_lookup(return_address - 1, &name, &offset) == 0) {
+      printk("  %s+0x%lx\n", (char *)name, offset);
+    } else {
+      printk("  ra=%p (unknown)\n", (void *)return_address);
+    }
 
     // Frame pointers should move toward higher stack addresses
     // when walking toward older frames on this RISC-V setup.

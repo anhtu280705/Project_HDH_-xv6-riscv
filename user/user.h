@@ -26,6 +26,7 @@ int pause(int);
 int uptime(void);
 int sync(void);
 int bttest(void);
+int panic_test(void);
 // ulib.c
 int stat(const char *, struct stat *);
 char *strcpy(char *, const char *);

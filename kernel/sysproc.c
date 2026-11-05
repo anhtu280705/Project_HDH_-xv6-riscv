@@ -110,3 +110,9 @@ sys_uptime(void)
   release(&tickslock);
   return xticks;
 }
+uint64
+sys_panic_test(void)
+{
+  panic("backtrace panic test");
+  return 0;
+}

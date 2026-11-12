@@ -15,9 +15,7 @@ read_fp(void)
 static int
 backtrace_frame_valid(uint64 fp, uint64 stack_bottom, uint64 stack_top)
 {
-  return fp >= stack_bottom + 16 &&
-         fp < stack_top &&
-         (fp & 7) == 0;
+  return fp >= stack_bottom + 16 && fp < stack_top && (fp & 7) == 0;
 }
 
 static int
@@ -118,11 +116,10 @@ uint64
 sys_bttest(void)
 {
   backtrace_test();
-if (backtrace_validation_test() < 0)
+  if (backtrace_validation_test() < 0)
     printk("backtrace_validation_test: FAIL\n");
   else
     printk("backtrace_validation_test: PASS\n");
-
 
   if (ksym_test() < 0)
     printk("ksym_test: FAIL\n");

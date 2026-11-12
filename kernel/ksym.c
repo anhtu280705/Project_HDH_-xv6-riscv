@@ -66,7 +66,7 @@ ksym_test(void)
       name[12] != 's' || name[13] != 't' || name[14] != '\0')
     return -1;
 
-    // Test an address outside all function symbols.
+  // Test an address outside all function symbols.
   // Output values must be reset when lookup fails.
   name = "invalid";
   offset = ~0ULL;

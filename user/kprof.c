@@ -84,6 +84,24 @@ sort_agg(int n)
   }
 }
 
+static void
+print_pad(int val, int width)
+{
+  int len = 0;
+  int v = val;
+  if (v <= 0)
+    len = 1;
+  while (v > 0) {
+    len++;
+    v /= 10;
+  }
+  while (len < width) {
+    printf(" ");
+    len++;
+  }
+  printf("%d", val);
+}
+
 // kprof top [N]: group snapshot by (mode, pid, pc), most frequent first.
 // Percentages are shares of *recorded* samples (dropped ones are not in the
 // denominator). They estimate where timer ticks landed, not CPU time.
@@ -123,17 +141,142 @@ top(int limit)
     ku += smp[i].is_user;
   printf("kprof top: %d recorded samples (%d kernel, %d user), %d dropped\n", n,
          n - ku, ku, st.dropped);
-  printf("  %%=share of recorded samples; kernel PCs are raw addresses until the\n"
-         "  symbol table is available; user PCs are never kernel-symbolized.\n");
-  printf("   count     %%  mode    pid  pc\n");
+  printf("  %%=share of recorded samples; kernel PCs resolved via ksym_lookup;\n"
+         "  user PCs are never kernel-symbolized.\n");
+  printf("  count      %%  mode       pid  pc                  symbol\n");
   for (int i = 0; i < m && i < limit; i++) {
     int pm = ag[i].count * 1000 / n;
-    printf("  %6d %3d.%d  %s %5d  %p\n", ag[i].count, pm / 10, pm % 10,
-           ag[i].is_user ? "user  " : "kernel", ag[i].pid,
-           (void *)ag[i].pc);
+    printf(" ");
+    print_pad(ag[i].count, 6);
+    printf(" ");
+    print_pad(pm / 10, 3);
+    printf(".%d%%  ", pm % 10);
+    printf("%s  ", ag[i].is_user ? "user  " : "kernel");
+    print_pad(ag[i].pid, 5);
+    printf("  %p  ", (void *)ag[i].pc);
+    if (ag[i].is_user) {
+      printf("<user>\n");
+    } else {
+      struct kprof_sym sym;
+      memset(&sym, 0, sizeof(sym));
+      sym.pc = ag[i].pc;
+      if (kprof(KPROF_CMD_SYM, &sym, sizeof(sym)) == 0 && sym.found)
+        printf("%s+0x%x\n", sym.name, (uint32)sym.offset);
+      else
+        printf("<unknown>\n");
+    }
   }
   if (m > limit)
     printf("  ... %d more distinct PCs\n", m - limit);
+}
+
+struct fn_agg {
+  char name[32];
+  uint32 is_user;
+  uint32 count;
+  uint32 distinct_pcs;
+};
+static struct fn_agg fn_ag[MAXS];
+
+// kprof fn [N]: group samples by resolved function symbol (or <user> for
+// user-space samples) across all offsets and PIDs, most frequent function first.
+static void
+fn_top(int limit)
+{
+  struct kprof_stat st;
+  int n = kprof(KPROF_CMD_READ, smp, MAXS);
+
+  if (n < 0 || get_status(&st) < 0) {
+    printf("kprof: cannot read samples\n");
+    return;
+  }
+  if (n == 0) {
+    printf("kprof: no samples (start the profiler and run a workload)\n");
+    return;
+  }
+
+  sort_samples(n);
+  int m = 0;
+  for (int i = 0; i < n; i++) {
+    if (m > 0 && ag[m - 1].pc == smp[i].pc &&
+        ag[m - 1].is_user == smp[i].is_user && ag[m - 1].pid == smp[i].pid) {
+      ag[m - 1].count++;
+    } else {
+      ag[m].pc = smp[i].pc;
+      ag[m].pid = smp[i].pid;
+      ag[m].is_user = smp[i].is_user;
+      ag[m].count = 1;
+      m++;
+    }
+  }
+
+  int nf = 0;
+  for (int i = 0; i < m; i++) {
+    char sym_name[32];
+    memset(sym_name, 0, sizeof(sym_name));
+    if (ag[i].is_user) {
+      strcpy(sym_name, "<user>");
+    } else {
+      struct kprof_sym sym;
+      memset(&sym, 0, sizeof(sym));
+      sym.pc = ag[i].pc;
+      if (kprof(KPROF_CMD_SYM, &sym, sizeof(sym)) == 0 && sym.found)
+        strcpy(sym_name, sym.name);
+      else
+        strcpy(sym_name, "<unknown>");
+    }
+
+    int found_idx = -1;
+    for (int j = 0; j < nf; j++) {
+      if (fn_ag[j].is_user == ag[i].is_user &&
+          strcmp(fn_ag[j].name, sym_name) == 0) {
+        found_idx = j;
+        break;
+      }
+    }
+    if (found_idx >= 0) {
+      fn_ag[found_idx].count += ag[i].count;
+      fn_ag[found_idx].distinct_pcs++;
+    } else {
+      strcpy(fn_ag[nf].name, sym_name);
+      fn_ag[nf].is_user = ag[i].is_user;
+      fn_ag[nf].count = ag[i].count;
+      fn_ag[nf].distinct_pcs = 1;
+      nf++;
+    }
+  }
+
+  for (int gap = nf / 2; gap > 0; gap /= 2) {
+    for (int i = gap; i < nf; i++) {
+      struct fn_agg t = fn_ag[i];
+      int j = i;
+      while (j >= gap && fn_ag[j - gap].count < t.count) {
+        fn_ag[j] = fn_ag[j - gap];
+        j -= gap;
+      }
+      fn_ag[j] = t;
+    }
+  }
+
+  int ku = 0;
+  for (int i = 0; i < n; i++)
+    ku += smp[i].is_user;
+  printf("kprof fn: %d recorded samples (%d kernel, %d user), %d functions\n",
+         n, n - ku, ku, nf);
+  printf("  count      %%  mode     pcs  function\n");
+  for (int i = 0; i < nf && i < limit; i++) {
+    int pm = fn_ag[i].count * 1000 / n;
+    printf(" ");
+    print_pad(fn_ag[i].count, 6);
+    printf(" ");
+    print_pad(pm / 10, 3);
+    printf(".%d%%  ", pm % 10);
+    printf("%s  ", fn_ag[i].is_user ? "user  " : "kernel");
+    print_pad(fn_ag[i].distinct_pcs, 4);
+    printf("  %s\n", fn_ag[i].name);
+  }
+  if (nf > limit)
+    printf("  ... %d more functions\n", nf - limit);
 }
 
 static void
@@ -146,9 +289,21 @@ dump(int limit)
     return;
   }
   printf("kprof dump: %d samples\n", n);
-  for (int i = 0; i < n && i < limit; i++)
-    printf("  [%d] cpu=%d pid=%d %s pc=%p\n", i, smp[i].cpu, smp[i].pid,
-           smp[i].is_user ? "user" : "kernel", (void *)smp[i].pc);
+  for (int i = 0; i < n && i < limit; i++) {
+    printf("  [%d] cpu=%d pid=%d %s pc=%p ", i, smp[i].cpu, smp[i].pid,
+           smp[i].is_user ? "user  " : "kernel", (void *)smp[i].pc);
+    if (smp[i].is_user) {
+      printf("<user>\n");
+    } else {
+      struct kprof_sym sym;
+      memset(&sym, 0, sizeof(sym));
+      sym.pc = smp[i].pc;
+      if (kprof(KPROF_CMD_SYM, &sym, sizeof(sym)) == 0 && sym.found)
+        printf("%s+0x%x\n", sym.name, (uint32)sym.offset);
+      else
+        printf("<unknown>\n");
+    }
+  }
   if (n > limit)
     printf("  ... %d more\n", n - limit);
 }
@@ -169,7 +324,7 @@ int
 main(int argc, char *argv[])
 {
   if (argc < 2) {
-    printf("usage: kprof start|stop|reset|status|top [N]|dump [N]\n");
+    printf("usage: kprof start|stop|reset|status|top [N]|fn [N]|dump [N]\n");
     exit(1);
   }
   if (strcmp(argv[1], "start") == 0)
@@ -182,6 +337,8 @@ main(int argc, char *argv[])
     print_status();
   else if (strcmp(argv[1], "top") == 0)
     top(argc > 2 ? atoi(argv[2]) : 10);
+  else if (strcmp(argv[1], "fn") == 0)
+    fn_top(argc > 2 ? atoi(argv[2]) : 10);
   else if (strcmp(argv[1], "dump") == 0)
     dump(argc > 2 ? atoi(argv[2]) : 20);
   else {

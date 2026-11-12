@@ -7,6 +7,7 @@
 #include "proc.h"
 #include "defs.h"
 #include "kprof.h"
+#include "ksym.h"
 
 // Per-CPU sample buffer. Written only by its own CPU from the timer
 // interrupt (interrupts are off there), read by any CPU in process context.
@@ -124,6 +125,30 @@ kprof_control(int cmd, uint64 buf, int cap)
 {
   struct proc *p = myproc();
   int ret = -1;
+
+  if (cmd == KPROF_CMD_SYM) {
+    struct kprof_sym sym;
+    const char *name = 0;
+    uint64 off = 0;
+    if (cap < (int)sizeof(sym))
+      return -1;
+    if (copyin(p->pagetable, p->sz, (char *)&sym, buf, sizeof(sym)) < 0)
+      return -1;
+    memset(sym.name, 0, sizeof(sym.name));
+    if (sym.pc >= KERNBASE && ksym_lookup(sym.pc, &name, &off) == 0 &&
+        name != 0) {
+      sym.found = 1;
+      sym.offset = off;
+      safestrcpy(sym.name, name, sizeof(sym.name));
+    } else {
+      sym.found = 0;
+      sym.offset = 0;
+      safestrcpy(sym.name, "<unknown>", sizeof(sym.name));
+    }
+    if (copyout(p->pagetable, p->sz, buf, (char *)&sym, sizeof(sym)) < 0)
+      return -1;
+    return 0;
+  }
 
 #ifdef KPROF_TEST_HOOKS
   if (cmd == KPROF_CMD_TEST_SPIN) {

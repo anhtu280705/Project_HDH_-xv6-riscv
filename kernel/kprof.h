@@ -13,6 +13,7 @@
 #define KPROF_CMD_RESET  3 // clear all data; -1 if still running
 #define KPROF_CMD_STATUS 4 // buf: struct kprof_stat, cap: sizeof(buf)
 #define KPROF_CMD_READ   5 // buf: struct kprof_sample[cap], returns count
+#define KPROF_CMD_SYM    8 // buf: struct kprof_sym, cap: sizeof(buf)
 
 // Test-only hooks, compiled in when the kernel is built with KPROF_TEST=1
 // (default for the course build, see Makefile). They never panic the kernel.
@@ -46,6 +47,13 @@ struct kprof_sample {
 struct kprof_range {
   uint64 begin;
   uint64 end;
+};
+
+struct kprof_sym {
+  uint64 pc;      // input: kernel PC to resolve
+  uint64 offset;  // output: byte offset from symbol start
+  uint32 found;   // output: 1 if resolved in kernel symbol table, 0 otherwise
+  char name[32];  // output: NUL-terminated function name (or "<unknown>")
 };
 
 #endif

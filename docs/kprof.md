@@ -1,8 +1,9 @@
 # kprof — timer-driven sampling profiler (Tú)
 
-Phạm vi: **kernel + user PC đều được lấy mẫu và phân loại**, nhưng **chỉ có PC thô**.
-Chưa symbolize kernel PC (chờ symbol table của Sơn). User PC **không bao giờ** được
-giải mã bằng symbol kernel.
+Phạm vi: **kernel + user PC đều được lấy mẫu và phân loại**. Kernel PC được giải mã sang
+`symbol+0xoffset` ở ngữ cảnh syscall thông qua `KPROF_CMD_SYM` (kết nối bảng ký hiệu nhúng
+`ksym_lookup` của Sơn). User PC **không bao giờ** được giải mã bằng symbol kernel và luôn
+được gắn nhãn `<user>`.
 
 ## Đường dữ liệu
 
@@ -35,11 +36,12 @@ Mọi lỗi trả `-1` (con trỏ sai, kích thước sai, lệnh lạ) và khô
 
 | cmd | ý nghĩa | trả về |
 |---|---|---|
-| `START` | bắt đầu lấy mẫu; **idempotent**; không xóa dữ liệu cũ | 0 |
-| `STOP` | dừng và chờ quiescent; **idempotent** | 0 |
-| `RESET` | xóa toàn bộ dữ liệu; **chỉ khi đã stop**, đang chạy → `-1` (không xóa gì) | 0 / -1 |
-| `STATUS` | `buf` = `struct kprof_stat`, `cap >= sizeof` | 0 / -1 |
-| `READ` | `buf` = mảng `struct kprof_sample`, `cap` = số phần tử (>0). Chép `min(cap, có sẵn)` mẫu (CPU 0 trước); **cắt bớt, không tràn** | số mẫu / -1 |
+| `START` (1) | bắt đầu lấy mẫu; **idempotent**; không xóa dữ liệu cũ | 0 |
+| `STOP` (2) | dừng và chờ quiescent; **idempotent** | 0 |
+| `RESET` (3) | xóa toàn bộ dữ liệu; **chỉ khi đã stop**, đang chạy → `-1` (không xóa gì) | 0 / -1 |
+| `STATUS` (4) | `buf` = `struct kprof_stat`, `cap >= sizeof` | 0 / -1 |
+| `READ` (5) | `buf` = mảng `struct kprof_sample`, `cap` = số phần tử (>0). Chép `min(cap, có sẵn)` mẫu (CPU 0 trước); **cắt bớt, không tràn** | số mẫu / -1 |
+| `SYM` (8) | `buf` = `struct kprof_sym`, `cap >= sizeof`. Tra cứu `ksym_lookup(pc, &name, &offset)` cho `pc >= KERNBASE`; trả `found=1` nếu tìm thấy, `found=0` (`"<unknown>"`) nếu ngoài vùng hoặc là địa chỉ user | 0 / -1 |
 
 `struct kprof_stat`: `version, running, ncpu, per_cpu_cap, recorded, kernel_samples,
 user_samples, dropped`. `kernel_samples/user_samples` = số timer tick quan sát được khi đang
@@ -56,12 +58,15 @@ Snapshot không atomic toàn cục giữa các CPU; mỗi record thì hoàn ch�
 ## Công cụ `kprof`
 
 ```
-kprof start | stop | reset | status | top [N] | dump [N]
+kprof start | stop | reset | status | top [N] | fn [N] | dump [N]
 ```
 
-`top` gom theo (mode, pid, pc), sắp giảm dần. **Phần trăm = tỷ lệ trên số mẫu đã ghi
-(recorded)**, không gồm mẫu bị drop, và là *ước lượng nơi timer tick rơi vào*, không phải
-CPU time hay số lần gọi hàm.
+- `top [N]`: gom nhóm theo `(mode, pid, pc)`, sắp xếp giảm dần theo số mẫu và hiển thị `symbol+0xoffset` (hoặc `<user>`).
+- `fn [N]`: gom nhóm ở mức **hàm kernel (function-level aggregation)** gộp tất cả các mẫu có chung tên hàm bất kể offset/PID, cho biết hàm kernel nào chiếm nhiều mẫu nhất cùng số lượng PC phân biệt (`pcs`) trong hàm đó.
+- `dump [N]`: in danh sách từng mẫu thô kèm `cpu`, `pid`, `mode`, `pc` và `symbol+0xoffset` / `<user>`.
+
+**Phần trăm = tỷ lệ trên số mẫu đã ghi (recorded)**, không gồm mẫu bị drop, và là
+*ước lượng nơi timer tick rơi vào*, không phải CPU time hay số lần gọi hàm.
 
 ## Giới hạn đã biết
 
@@ -74,7 +79,7 @@ CPU time hay số lần gọi hàm.
 
 ## Kiểm thử
 
-`user/kproftest.c` (12 case, mỗi case in PASS/FAIL), chạy bằng:
+`user/kproftest.c` (15 case, mỗi case in PASS/FAIL), chạy bằng:
 
 ```
 make kernel/kernel fs.img
@@ -88,11 +93,13 @@ make kernel/kernel fs.img
 | KP03 | stop → số liệu đóng băng |
 | KP04 | reset khi chạy bị từ chối; sau stop xóa sạch |
 | KP05 | start/stop lặp 50 lần idempotent, không đếm đôi |
-| KP06 | kernel hot loop: ≥70% tick của process (theo pid) nằm trong vòng lặp |
+| KP06 | kernel hot loop: ≥70% tick của process (theo pid) nằm trong vòng lặp & giải mã đúng `kprof_spin` |
 | KP06b | user hot loop: như trên với PC user |
 | KP07 | user PC < KERNBASE & pid≠0; kernel PC ≥ KERNBASE; cpu hợp lệ |
 | KP08 | đọc status/snapshot liên tục khi đang lấy mẫu: không record hỏng, count không giảm |
 | KP09 | buffer đầy → `dropped>0`, mỗi CPU ≤ cap |
 | KP10 | con trỏ/size/lệnh sai → `-1`; truncate đúng; kernel vẫn sống |
 | KP11 | mẫu gắn đúng pid của tiến trình con |
-
+| KP12 | kiểm chứng hợp đồng giải mã symbol (`KPROF_CMD_SYM`): hai câu lệnh kế tiếp trong `kprof_spin` chênh đúng 4 byte offset; địa chỉ user/ngoài vùng trả về `found=0` |
+| KP13 | stress đồng thời 4 tiến trình gọi `START`/`STATUS`/`READ`/`SYM` khi đang lấy mẫu không race/deadlock |
+| KP14 | kiểm tra không rò rỉ bộ nhớ trang (`sbrk`) hoặc tài nguyên sau nhiều chu kỳ lấy mẫu + `fork`/`exit` |

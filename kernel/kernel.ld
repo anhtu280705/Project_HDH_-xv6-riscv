@@ -41,5 +41,11 @@ SECTIONS
     *(.bss .bss.*)
   }
 
+  /* Kernel symbol table */
+  .ksym : {
+    . = ALIGN(16);
+    *(.ksym)
+  }
+
   PROVIDE(end = .);
 }

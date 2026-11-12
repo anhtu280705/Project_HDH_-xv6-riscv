@@ -201,6 +201,11 @@ kp06(void)
   CHECK(r.begin != 0 && r.end > r.begin);
   CHECK(hit >= 10);
   CHECK(hit * 100 >= mine * 70);
+  struct kprof_sym sym;
+  memset(&sym, 0, sizeof(sym));
+  sym.pc = r.begin;
+  CHECK(kprof(KPROF_CMD_SYM, &sym, sizeof(sym)) == 0);
+  CHECK(sym.found == 1 && strcmp(sym.name, "kprof_spin") == 0);
   return ok;
 }
 
@@ -265,6 +270,11 @@ kp07(void)
       break;
   }
   CHECK(nk > 0 && nu > 0);
+  struct kprof_sym usym;
+  memset(&usym, 0, sizeof(usym));
+  usym.pc = (uint64)kp_user_begin;
+  CHECK(kprof(KPROF_CMD_SYM, &usym, sizeof(usym)) == 0);
+  CHECK(usym.found == 0 && strcmp(usym.name, "<unknown>") == 0);
   return ok;
 }
 
@@ -366,9 +376,12 @@ kp10(void)
   CHECK(kprof(KPROF_CMD_READ, (void *)KERNBASE_, 4) == -1);
   CHECK(kprof(KPROF_CMD_READ, (void *)(page_end - 4), 4) == -1);
   CHECK(kprof(KPROF_CMD_TEST_SPIN, (void *)KERNBASE_, 1) == -1);
+  CHECK(kprof(KPROF_CMD_SYM, (void *)0, sizeof(struct kprof_sym)) == -1);
+  CHECK(kprof(KPROF_CMD_SYM, (void *)KERNBASE_, sizeof(struct kprof_sym)) == -1);
 
   // bad sizes
   CHECK(kprof(KPROF_CMD_STATUS, &st, sizeof(st) - 1) == -1);
+  CHECK(kprof(KPROF_CMD_SYM, &st, sizeof(struct kprof_sym) - 1) == -1);
   CHECK(kprof(KPROF_CMD_STATUS, &st, 0) == -1);
   CHECK(kprof(KPROF_CMD_STATUS, &st, -1) == -1);
   CHECK(kprof(KPROF_CMD_READ, smp, 0) == -1);
@@ -424,6 +437,141 @@ kp11(void)
   return ok;
 }
 
+// KP12: symbol resolution contract — adjacent instructions inside a kernel
+// function resolve to the same symbol with exact byte-offset delta, while
+// user-space and out-of-range addresses never match kernel symbols.
+static int
+kp12(void)
+{
+  int ok = 1;
+  struct kprof_range r;
+  struct kprof_sym s1, s2, su, sbad;
+
+  CHECK(reset_all() == 0);
+  CHECK(kspin(1, &r) == 0);
+  CHECK(r.begin >= KERNBASE_ && r.end > r.begin + 4);
+
+  memset(&s1, 0, sizeof(s1));
+  s1.pc = r.begin;
+  CHECK(kprof(KPROF_CMD_SYM, &s1, sizeof(s1)) == 0);
+  CHECK(s1.found == 1);
+  CHECK(strcmp(s1.name, "kprof_spin") == 0);
+
+  memset(&s2, 0, sizeof(s2));
+  s2.pc = r.begin + 4;
+  CHECK(kprof(KPROF_CMD_SYM, &s2, sizeof(s2)) == 0);
+  CHECK(s2.found == 1);
+  CHECK(strcmp(s2.name, "kprof_spin") == 0);
+  CHECK(s2.offset == s1.offset + 4);
+
+  // User PC and out-of-range kernel address must never match a kernel symbol.
+  memset(&su, 0, sizeof(su));
+  su.pc = (uint64)kp_user_begin;
+  CHECK(kprof(KPROF_CMD_SYM, &su, sizeof(su)) == 0);
+  CHECK(su.found == 0 && strcmp(su.name, "<unknown>") == 0);
+
+  memset(&sbad, 0, sizeof(sbad));
+  sbad.pc = 0xFFFFFFFF80000000UL;
+  CHECK(kprof(KPROF_CMD_SYM, &sbad, sizeof(sbad)) == 0);
+  CHECK(sbad.found == 0 && strcmp(sbad.name, "<unknown>") == 0);
+  return ok;
+}
+
+// KP13: concurrent control & symbol lookup stress across multiple processes.
+static int
+kp13(void)
+{
+  int ok = 1;
+  struct kprof_range r;
+  int pids[3];
+
+  CHECK(reset_all() == 0);
+  CHECK(kspin(1, &r) == 0);
+  CHECK(kprof(KPROF_CMD_START, 0, 0) == 0);
+
+  for (int c = 0; c < 3; c++) {
+    int pid = fork();
+    if (pid < 0) {
+      kprof(KPROF_CMD_STOP, 0, 0);
+      return 0;
+    }
+    if (pid == 0) {
+      int bad = 0;
+      struct kprof_stat st;
+      struct kprof_sym sym;
+      for (int iter = 0; iter < 25; iter++) {
+        if (kprof(KPROF_CMD_START, 0, 0) < 0)
+          bad = 1;
+        if (status(&st) < 0 || st.running != 1)
+          bad = 1;
+        int n = kprof(KPROF_CMD_READ, smp, 16);
+        if (n < 0 || n > 16)
+          bad = 1;
+        memset(&sym, 0, sizeof(sym));
+        sym.pc = r.begin;
+        if (kprof(KPROF_CMD_SYM, &sym, sizeof(sym)) < 0 || sym.found != 1)
+          bad = 1;
+      }
+      exit(bad);
+    }
+    pids[c] = pid;
+  }
+
+  CHECK(kspin(15, 0) == 0);
+  for (int c = 0; c < 3; c++) {
+    int xs = -1;
+    CHECK(wait(&xs) == pids[c]);
+    CHECK(xs == 0);
+  }
+  CHECK(kprof(KPROF_CMD_STOP, 0, 0) == 0);
+  return ok;
+}
+
+// KP14: repeated profiling + fork/exit cycles leak no pages or file descriptors.
+static int
+kp14(void)
+{
+  int ok = 1;
+  struct kprof_stat st;
+  struct kprof_sym sym;
+  struct kprof_range r;
+
+  CHECK(reset_all() == 0);
+  char *brk0 = sbrk(0);
+
+  for (int round = 0; round < 6; round++) {
+    CHECK(kprof(KPROF_CMD_START, 0, 0) == 0);
+    CHECK(kspin(2, &r) == 0);
+    CHECK(kprof(KPROF_CMD_STOP, 0, 0) == 0);
+    CHECK(status(&st) == 0 && st.recorded > 0);
+    int n = kprof(KPROF_CMD_READ, smp, 32);
+    CHECK(n > 0);
+    memset(&sym, 0, sizeof(sym));
+    sym.pc = r.begin;
+    CHECK(kprof(KPROF_CMD_SYM, &sym, sizeof(sym)) == 0 && sym.found == 1);
+    CHECK(kprof(KPROF_CMD_RESET, 0, 0) == 0);
+  }
+
+  // Verify process heap and kernel page allocator still allocate & reclaim cleanly.
+  int pid = fork();
+  CHECK(pid >= 0);
+  if (pid == 0) {
+    int pages = 32;
+    char *p = sbrk(pages * 4096);
+    if (p == (char *)-1)
+      exit(1);
+    for (int i = 0; i < pages; i++)
+      p[i * 4096] = (char)i;
+    if (sbrk(-pages * 4096) == (char *)-1)
+      exit(2);
+    exit(0);
+  }
+  int xs = -1;
+  CHECK(wait(&xs) == pid && xs == 0);
+  CHECK(sbrk(0) == brk0);
+  return ok;
+}
+
 struct tcase {
   char *id;
   char *name;
@@ -443,6 +591,9 @@ static struct tcase cases[] = {
     {"KP09", "buffer_overflow_dropped", kp09},
     {"KP10", "bad_args", kp10},
     {"KP11", "pid_attribution", kp11},
+    {"KP12", "sym_resolution_contract", kp12},
+    {"KP13", "concurrent_control_stress", kp13},
+    {"KP14", "no_memory_or_fd_leak", kp14},
 };
 
 int

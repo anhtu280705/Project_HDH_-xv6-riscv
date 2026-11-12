@@ -107,8 +107,9 @@ $K/ksymtab.o: $K/ksymtab.S
 	$(CC) -march=rv64gc -g $(DETFLAGS) -c -o $@ $<
 
 # Final link: use the real symbol table, not the stub.
-$K/kernel: $(OBJS) $K/ksymtab.o $K/kernel.ld
+$K/kernel: $(OBJS) $K/ksymtab.o $K/kernel.ld tools/verify_ksym.py
 	$(LD) $(LDFLAGS) -T $K/kernel.ld -o $@ $(OBJS) $K/ksymtab.o
+	python3 tools/verify_ksym.py $K/kernel
 	$(OBJDUMP) -S $K/kernel > $K/kernel.asm
 	$(OBJDUMP) -t $K/kernel | sed '1,/SYMBOL TABLE/d; s/ .* / /; /^$$/d' > $K/kernel.sym
 

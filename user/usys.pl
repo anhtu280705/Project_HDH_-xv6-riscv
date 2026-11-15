@@ -45,3 +45,4 @@ entry("uptime");
 entry("sync");
 entry("lockstat");
 
+entry("lockstat_ctl");

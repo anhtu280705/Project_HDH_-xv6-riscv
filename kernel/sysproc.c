@@ -148,3 +148,26 @@ sys_lockstat(void)
   }
   return count;
 }
+
+extern struct spinlock *lock_registry[];
+extern int n_reg_locks;
+
+uint64
+sys_lockstat_ctl(void)
+{
+  int cmd;
+  argint(0, &cmd);
+
+  if (cmd == 1) { // RESET
+    for (int i = 0; i < n_reg_locks; i++) {
+      struct spinlock *lk = lock_registry[i];
+      if (lk) {
+        __atomic_store_n(&lk->acquisitions, 0, __ATOMIC_RELAXED);
+        __atomic_store_n(&lk->contended_acquisitions, 0, __ATOMIC_RELAXED);
+        __atomic_store_n(&lk->failed_attempts, 0, __ATOMIC_RELAXED);
+      }
+    }
+    return 0;
+  }
+  return -1;
+}

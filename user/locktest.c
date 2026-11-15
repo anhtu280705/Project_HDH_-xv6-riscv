@@ -40,16 +40,43 @@ test_contention()
 int
 main(int argc, char *argv[])
 {
-  printf("=== BAT DAU LOCKTEST (CPUS contention) ===\n");
-  test_contention();
+  printf("=== BAT DAU LOCKTEST (WITH ORACLES) ===\n");
 
-  int n = lockstat(stats, MAX_LOCKS);
-  printf("=== EXPORTED %d LOCKS TO USERSPACE ===\n", n);
-  for (int i = 0; i < n; i++) {
-    printf("lock [%s]: acquires=%d contended=%d failed=%d\n", stats[i].name,
-           stats[i].acquisitions, stats[i].contended_acquisitions,
-           stats[i].failed_attempts);
+  // Oracle 1: Kiem tra reset (LS01)
+  if (lockstat_ctl(1) != 0) {
+    printf("[FAIL] LS01: lockstat_ctl(RESET) failed\n");
+    exit(1);
   }
+  printf("[PASS] LS01: Reset counters succeeded\n");
+
+  // Oracle 2: Kiem tra tham so loi (LS02)
+  if (lockstat_ctl(999) != -1) {
+    printf("[FAIL] LS02: Invalid ctl command did not return -1\n");
+    exit(1);
+  }
+  printf("[PASS] LS02: Invalid ctl command properly rejected\n");
+
+  // Oracle 3: Tao tranh chap va kiem chung metrics (LS03)
+  test_contention();
+  int n = lockstat(stats, MAX_LOCKS);
+  if (n <= 0) {
+    printf("[FAIL] LS03: No locks exported\n");
+    exit(1);
+  }
+
+  int total_acq = 0;
+  int total_contended = 0;
+  for (int i = 0; i < n; i++) {
+    total_acq += stats[i].acquisitions;
+    total_contended += stats[i].contended_acquisitions;
+  }
+
+  if (total_acq <= 0) {
+    printf("[FAIL] LS03: total_acq == 0\n");
+    exit(1);
+  }
+  printf("[PASS] LS03: Exported %d locks (total_acq=%d, contended=%d)\n", n,
+         total_acq, total_contended);
 
   printf("=== LOCKTEST: [PASS] ===\n");
   exit(0);

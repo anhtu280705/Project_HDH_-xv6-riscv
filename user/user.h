@@ -27,6 +27,7 @@ int uptime(void);
 int sync(void);
 struct lockstat;
 int lockstat(struct lockstat *, int);
+int lockstat_ctl(int);
 
 // ulib.c
 int stat(const char *, struct stat *);

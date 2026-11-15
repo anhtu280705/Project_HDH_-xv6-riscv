@@ -41,7 +41,7 @@ def run_test_case(name, cmd, pass_marker, expect_panic=False, timeout=DEFAULT_TI
             chunk = os.read(p.stdout.fileno(), 4096)
             if not chunk:
                 break
-            output += chunk
+            output += chunk.replace(b"$ ", b"")
 
             if (b"$ " in output or b"init: starting sh" in output) and not sent_cmd:
                 time.sleep(0.4)
@@ -51,11 +51,11 @@ def run_test_case(name, cmd, pass_marker, expect_panic=False, timeout=DEFAULT_TI
                 except (BrokenPipeError, OSError):
                     break
 
-            if (not expect_panic and pass_marker.encode("utf-8") in output) or (expect_panic and b"exiting" in output):
+            if (not expect_panic and pass_marker.encode("utf-8") in output) or (expect_panic and b"panic: init exiting" in output):
                 time.sleep(0.3)
                 break
 
-            if not expect_panic and b"exiting" in output:
+            if not expect_panic and b"panic: init exiting" in output:
                 time.sleep(0.2)
                 break
 
@@ -65,21 +65,21 @@ def run_test_case(name, cmd, pass_marker, expect_panic=False, timeout=DEFAULT_TI
         pass
     kill_qemu()
 
-    decoded = output.decode("utf-8", errors="ignore")
+    decoded = "".join(c for c in output.decode("utf-8", errors="ignore") if c != "$")
 
     if timed_out:
         print(f"  -> [FAIL] {name}: TIMEOUT sau {timeout}s")
         return False, decoded
 
     if expect_panic:
-        if ("panic" in decoded or "exiting" in decoded) and pass_marker in decoded:
+        if ("panic" in decoded or "panic: init exiting" in decoded) and pass_marker in decoded:
             print(f"  -> [PASS] {name}: Bat duoc expected panic & tu dong reboot QEMU")
             return True, decoded
         else:
             print(f"  -> [FAIL] {name}: Khong thay panic nhu ky vong")
             return False, decoded
     else:
-        if "exiting" in decoded:
+        if "panic: init exiting" in decoded:
             print(f"  -> [FAIL] {name}: Kernel bi unexpected PANIC!")
             return False, decoded
         if pass_marker in decoded:
@@ -103,7 +103,7 @@ def main():
         ("Lockstat CLI Reset", "lockstat reset", "counters reset to 0", False, 20),
         ("Lockstat CLI Delta", "lockstat delta 1", "=== LOCKSTAT DELTA", False, 20),
         # Demo co che Expected-Panic Reboot (san sang cho module Backtrace cua Son)
-        ("Expected-Panic Reboot Check", "echo SIMULATE_PANIC; kill 1", "exiting", True, 20),
+        ("Expected-Panic Reboot Check", "echo SIMULATE_PANIC; kill 1", "panic: init exiting", True, 20),
     ]
 
     passed = 0

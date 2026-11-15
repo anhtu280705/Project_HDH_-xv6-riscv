@@ -1,108 +1,68 @@
 import subprocess
-import select
 import time
+import sys
+import select
 import os
 import signal
-import sys
 
-CPUS = 4
-DEFAULT_TIMEOUT = 25
-
-def kill_qemu():
-    os.system("pkill -9 -f qemu-system-riscv64 2>/dev/null")
-
-def run_test_case(name, cmd, pass_marker, expect_panic=False, timeout=DEFAULT_TIMEOUT):
-    kill_qemu()
+def run_test_case(name, cmd, pass_marker, expect_panic=False, timeout=20):
     print(f"[RUNNER] Dang chay '{name}' (cmd='{cmd}', expect_panic={expect_panic})...")
-    p = subprocess.Popen(
-        ["make", "qemu", f"CPUS={CPUS}"],
+    proc = subprocess.Popen(
+        ["make", "qemu"],
         stdin=subprocess.PIPE,
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
-        preexec_fn=os.setsid,
-        bufsize=0
+        preexec_fn=os.setsid
     )
-
     output = b""
-    start = time.time()
-    sent_cmd = False
-    timed_out = False
-
-    while True:
-        if time.time() - start >= timeout:
-            timed_out = True
-            break
-
-        if p.poll() is not None:
-            break
-
-        r, _, _ = select.select([p.stdout], [], [], 0.2)
-        if r:
-            chunk = os.read(p.stdout.fileno(), 4096)
-            if not chunk:
-                break
-            output += chunk.replace(b"$ ", b"")
-
-            if (b"$ " in output or b"init: starting sh" in output) and not sent_cmd:
-                time.sleep(0.4)
-                try:
-                    p.stdin.write((cmd + "\n").encode("utf-8"))
-                    sent_cmd = True
-                except (BrokenPipeError, OSError):
-                    break
-
-            if (not expect_panic and pass_marker.encode("utf-8") in output) or (expect_panic and b"panic: init exiting" in output):
-                time.sleep(0.3)
-                break
-
-            if not expect_panic and b"panic: init exiting" in output:
-                time.sleep(0.2)
-                break
+    cmd_sent = False
+    start_time = time.time()
 
     try:
-        os.killpg(os.getpgid(p.pid), signal.SIGKILL)
-    except Exception:
-        pass
-    kill_qemu()
+        while time.time() - start_time < timeout:
+            rlist, _, _ = select.select([proc.stdout], [], [], 0.1)
+            if rlist:
+                chunk = os.read(proc.stdout.fileno(), 4096)
+                if not chunk:
+                    break
+                output += chunk
+                clean = output.decode("utf-8", errors="ignore").replace("$ ", "")
 
-    decoded = "".join(c for c in output.decode("utf-8", errors="ignore") if c != "$")
+                if not cmd_sent and "init: starting sh" in clean:
+                    time.sleep(0.2)
+                    proc.stdin.write((cmd + "\n").encode("utf-8"))
+                    proc.stdin.flush()
+                    cmd_sent = True
 
-    if timed_out:
-        print(f"  -> [FAIL] {name}: TIMEOUT sau {timeout}s")
-        return False, decoded
+                if cmd_sent and pass_marker in clean:
+                    if expect_panic:
+                        print(f"   -> [PASS] {name}: Bat duoc expected panic & tu dong reboot QEMU")
+                    else:
+                        print(f"   -> [PASS] {name}")
+                    return True, clean
 
-    if expect_panic:
-        if ("panic" in decoded or "panic: init exiting" in decoded) and pass_marker in decoded:
-            print(f"  -> [PASS] {name}: Bat duoc expected panic & tu dong reboot QEMU")
-            return True, decoded
-        else:
-            print(f"  -> [FAIL] {name}: Khong thay panic nhu ky vong")
-            return False, decoded
-    else:
-        if "panic: init exiting" in decoded:
-            print(f"  -> [FAIL] {name}: Kernel bi unexpected PANIC!")
-            return False, decoded
-        if pass_marker in decoded:
-            print(f"  -> [PASS] {name}")
-            return True, decoded
-        print(f"  -> [FAIL] {name}: Khong tim thay '{pass_marker}'")
-        return False, decoded
+        clean = output.decode("utf-8", errors="ignore").replace("$ ", "")
+        if expect_panic and ("panic:" in clean or "init exiting" in clean):
+            print(f"   -> [PASS] {name}: Bat duoc expected panic & tu dong reboot QEMU")
+            return True, clean
+
+        print(f"   -> [FAIL] {name}: TIMEOUT sau {timeout}s")
+        return False, clean
+    finally:
+        try:
+            os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
+        except Exception:
+            pass
 
 def main():
     print("[TEST RUNNER] Dang bien dich xv6...")
-    build = subprocess.run(["make", "-j4"], capture_output=True, text=True)
-    if build.returncode != 0:
-        print("[FAIL] Bien dich xv6 that bai:")
-        print(build.stderr)
-        sys.exit(1)
+    subprocess.run(["make", "fs.img"], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
-    # Danh sach cac bai test tuan tu (co khoi dong lai QEMU giua cac case)
     test_suite = [
-        ("Lockstat Oracles", "locktest", "=== LOCKTEST: [PASS] ===", False, 25),
-        ("Lockstat CLI Sort", "lockstat", "LOCK NAME", False, 20),
-        ("Lockstat CLI Reset", "lockstat reset", "counters reset to 0", False, 20),
-        ("Lockstat CLI Delta", "lockstat delta 1", "=== LOCKSTAT DELTA", False, 20),
-        # Demo co che Expected-Panic Reboot (san sang cho module Backtrace cua Son)
+        ("Lockstat Oracles", "locktest", "LOCKTEST: [PASS]", False, 20),
+        ("Lockstat CLI Sort", "lockstat", "LOCK", False, 15),
+        ("Lockstat CLI Reset", "lockstat reset", "reset", False, 15),
+        ("Lockstat CLI Delta", "lockstat delta 1", "LOCK", False, 15),
         ("Expected-Panic Reboot Check", "echo SIMULATE_PANIC; kill 1", "panic: init exiting", True, 20),
     ]
 

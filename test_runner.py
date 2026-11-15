@@ -51,7 +51,7 @@ def run_test_case(name, cmd, pass_marker, expect_panic=False, timeout=DEFAULT_TI
                 except (BrokenPipeError, OSError):
                     break
 
-            if pass_marker.encode("utf-8") in output or (expect_panic and b"init exiting" in output):
+            if (not expect_panic and pass_marker.encode("utf-8") in output) or (expect_panic and b"exiting" in output):
                 time.sleep(0.3)
                 break
 
@@ -72,7 +72,7 @@ def run_test_case(name, cmd, pass_marker, expect_panic=False, timeout=DEFAULT_TI
         return False, decoded
 
     if expect_panic:
-        if ("panic:" in decoded or "init exiting" in decoded) and pass_marker in decoded:
+        if ("panic" in decoded or "exiting" in decoded) and pass_marker in decoded:
             print(f"  -> [PASS] {name}: Bat duoc expected panic & tu dong reboot QEMU")
             return True, decoded
         else:

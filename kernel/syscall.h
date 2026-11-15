@@ -21,5 +21,5 @@
 #define SYS_mkdir        20
 #define SYS_close        21
 #define SYS_sync         22
-#define SYS_lockstat     24
+#define SYS_lockstat     27
 #define SYS_lockstat_ctl 25

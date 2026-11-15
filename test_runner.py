@@ -55,7 +55,7 @@ def run_test_case(name, cmd, pass_marker, expect_panic=False, timeout=DEFAULT_TI
                 time.sleep(0.3)
                 break
 
-            if not expect_panic and b"panic:" in output:
+            if not expect_panic and b"exiting" in output:
                 time.sleep(0.2)
                 break
 

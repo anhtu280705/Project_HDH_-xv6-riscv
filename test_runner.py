@@ -79,7 +79,7 @@ def run_test_case(name, cmd, pass_marker, expect_panic=False, timeout=DEFAULT_TI
             print(f"  -> [FAIL] {name}: Khong thay panic nhu ky vong")
             return False, decoded
     else:
-        if "panic:" in decoded:
+        if "exiting" in decoded:
             print(f"  -> [FAIL] {name}: Kernel bi unexpected PANIC!")
             return False, decoded
         if pass_marker in decoded:

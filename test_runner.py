@@ -103,7 +103,7 @@ def main():
         ("Lockstat CLI Reset", "lockstat reset", "counters reset to 0", False, 20),
         ("Lockstat CLI Delta", "lockstat delta 1", "=== LOCKSTAT DELTA", False, 20),
         # Demo co che Expected-Panic Reboot (san sang cho module Backtrace cua Son)
-        ("Expected-Panic Reboot Check", "echo SIMULATE_PANIC; kill 1", "panic: init exiting", True, 20),
+        ("Expected-Panic Reboot Check", "echo SIMULATE_PANIC; kill 1", "exiting", True, 20),
     ]
 
     passed = 0

@@ -34,8 +34,7 @@ print_status(void)
   printf("kprof status (v%d): %s\n", st.version,
          st.running ? "RUNNING" : "stopped");
   printf("  cpus=%d capacity/cpu=%d\n", st.ncpu, st.per_cpu_cap);
-  printf("  observed: kernel=%d user=%d\n", st.kernel_samples,
-         st.user_samples);
+  printf("  observed: kernel=%d user=%d\n", st.kernel_samples, st.user_samples);
   printf("  recorded=%d dropped=%d\n", st.recorded, st.dropped);
 }
 
@@ -141,8 +140,9 @@ top(int limit)
     ku += smp[i].is_user;
   printf("kprof top: %d recorded samples (%d kernel, %d user), %d dropped\n", n,
          n - ku, ku, st.dropped);
-  printf("  %%=share of recorded samples; kernel PCs resolved via ksym_lookup;\n"
-         "  user PCs are never kernel-symbolized.\n");
+  printf(
+    "  %%=share of recorded samples; kernel PCs resolved via ksym_lookup;\n"
+    "  user PCs are never kernel-symbolized.\n");
   printf("  count      %%  mode       pid  pc                  symbol\n");
   for (int i = 0; i < m && i < limit; i++) {
     int pm = ag[i].count * 1000 / n;

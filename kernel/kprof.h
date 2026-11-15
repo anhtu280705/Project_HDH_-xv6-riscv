@@ -27,19 +27,19 @@
 struct kprof_stat {
   uint32 version;
   uint32 running;
-  uint32 ncpu;         // CPUs that may record samples
-  uint32 per_cpu_cap;  // effective per-CPU capacity
-  uint32 recorded;     // samples stored in buffers
+  uint32 ncpu;           // CPUs that may record samples
+  uint32 per_cpu_cap;    // effective per-CPU capacity
+  uint32 recorded;       // samples stored in buffers
   uint32 kernel_samples; // timer ticks observed in kernel mode while running
   uint32 user_samples;   // timer ticks observed in user mode while running
-  uint32 dropped;      // observed ticks that did not fit (recorded + dropped
-                       // == kernel_samples + user_samples when stopped)
+  uint32 dropped;        // observed ticks that did not fit (recorded + dropped
+                         // == kernel_samples + user_samples when stopped)
 };
 
 struct kprof_sample {
-  uint64 pc;   // interrupted PC. is_user: user VA of process `pid`, never a
-               // kernel symbol address. !is_user: kernel text address.
-  uint32 pid;  // process running at the tick (0: scheduler / no process)
+  uint64 pc;  // interrupted PC. is_user: user VA of process `pid`, never a
+              // kernel symbol address. !is_user: kernel text address.
+  uint32 pid; // process running at the tick (0: scheduler / no process)
   uint16 cpu;
   uint16 is_user;
 };
@@ -50,10 +50,10 @@ struct kprof_range {
 };
 
 struct kprof_sym {
-  uint64 pc;      // input: kernel PC to resolve
-  uint64 offset;  // output: byte offset from symbol start
-  uint32 found;   // output: 1 if resolved in kernel symbol table, 0 otherwise
-  char name[32];  // output: NUL-terminated function name (or "<unknown>")
+  uint64 pc;     // input: kernel PC to resolve
+  uint64 offset; // output: byte offset from symbol start
+  uint32 found;  // output: 1 if resolved in kernel symbol table, 0 otherwise
+  char name[32]; // output: NUL-terminated function name (or "<unknown>")
 };
 
 #endif

@@ -11,7 +11,7 @@
 #include "kernel/kprof.h"
 #include "user/user.h"
 
-#define MAXS (NCPU * KPROF_PER_CPU)
+#define MAXS      (NCPU * KPROF_PER_CPU)
 #define KERNBASE_ 0x80000000UL
 
 static struct kprof_sample smp[MAXS];
@@ -159,7 +159,8 @@ kp05(void)
   CHECK(status(&st) == 0);
   CHECK(st.running == 0);
   CHECK(kprof(KPROF_CMD_START, 0, 0) == 0);
-  CHECK(kprof(KPROF_CMD_START, 0, 0) == 0); // second start must not double-count
+  CHECK(kprof(KPROF_CMD_START, 0, 0) ==
+        0); // second start must not double-count
   CHECK(kspin(5, 0) == 0);
   CHECK(kprof(KPROF_CMD_STOP, 0, 0) == 0);
   CHECK(status(&st) == 0);
@@ -377,7 +378,8 @@ kp10(void)
   CHECK(kprof(KPROF_CMD_READ, (void *)(page_end - 4), 4) == -1);
   CHECK(kprof(KPROF_CMD_TEST_SPIN, (void *)KERNBASE_, 1) == -1);
   CHECK(kprof(KPROF_CMD_SYM, (void *)0, sizeof(struct kprof_sym)) == -1);
-  CHECK(kprof(KPROF_CMD_SYM, (void *)KERNBASE_, sizeof(struct kprof_sym)) == -1);
+  CHECK(kprof(KPROF_CMD_SYM, (void *)KERNBASE_, sizeof(struct kprof_sym)) ==
+        -1);
 
   // bad sizes
   CHECK(kprof(KPROF_CMD_STATUS, &st, sizeof(st) - 1) == -1);
@@ -579,21 +581,21 @@ struct tcase {
 };
 
 static struct tcase cases[] = {
-    {"KP01", "off_no_samples", kp01},
-    {"KP02", "start_collects", kp02},
-    {"KP03", "stop_freezes", kp03},
-    {"KP04", "reset_contract", kp04},
-    {"KP05", "repeat_start_stop", kp05},
-    {"KP06", "kernel_hot_loop", kp06},
-    {"KP06b", "user_hot_loop", kp06b},
-    {"KP07", "pc_classification", kp07},
-    {"KP08", "snapshot_while_sampling", kp08},
-    {"KP09", "buffer_overflow_dropped", kp09},
-    {"KP10", "bad_args", kp10},
-    {"KP11", "pid_attribution", kp11},
-    {"KP12", "sym_resolution_contract", kp12},
-    {"KP13", "concurrent_control_stress", kp13},
-    {"KP14", "no_memory_or_fd_leak", kp14},
+  {"KP01", "off_no_samples", kp01},
+  {"KP02", "start_collects", kp02},
+  {"KP03", "stop_freezes", kp03},
+  {"KP04", "reset_contract", kp04},
+  {"KP05", "repeat_start_stop", kp05},
+  {"KP06", "kernel_hot_loop", kp06},
+  {"KP06b", "user_hot_loop", kp06b},
+  {"KP07", "pc_classification", kp07},
+  {"KP08", "snapshot_while_sampling", kp08},
+  {"KP09", "buffer_overflow_dropped", kp09},
+  {"KP10", "bad_args", kp10},
+  {"KP11", "pid_attribution", kp11},
+  {"KP12", "sym_resolution_contract", kp12},
+  {"KP13", "concurrent_control_stress", kp13},
+  {"KP14", "no_memory_or_fd_leak", kp14},
 };
 
 int

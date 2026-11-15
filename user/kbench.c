@@ -32,4 +32,3 @@ main(int argc, char *argv[])
   printf("kbench: %s %d ticks=%d\n", argv[1], atoi(argv[2]), uptime() - t0);
   exit(0);
 }
-

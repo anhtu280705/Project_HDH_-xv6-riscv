@@ -51,7 +51,7 @@ def run_test_case(name, cmd, pass_marker, expect_panic=False, timeout=DEFAULT_TI
                 except (BrokenPipeError, OSError):
                     break
 
-            if pass_marker.encode("utf-8") in output:
+            if pass_marker.encode("utf-8") in output or (expect_panic and b"init exiting" in output):
                 time.sleep(0.3)
                 break
 

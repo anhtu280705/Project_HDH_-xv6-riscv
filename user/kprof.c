@@ -43,10 +43,10 @@ cmp_key(struct kprof_sample *a, struct kprof_sample *b)
 {
   if (a->is_user != b->is_user)
     return a->is_user < b->is_user ? -1 : 1;
-  if (a->pid != b->pid)
-    return a->pid < b->pid ? -1 : 1;
   if (a->pc != b->pc)
     return a->pc < b->pc ? -1 : 1;
+  if (a->pid != b->pid)
+    return a->pid < b->pid ? -1 : 1;
   return 0;
 }
 
@@ -226,6 +226,8 @@ fn_top(int limit)
         strcpy(sym_name, "<unknown>");
     }
 
+    int is_new_pc = (i == 0 || ag[i].is_user != ag[i - 1].is_user ||
+                     ag[i].pc != ag[i - 1].pc);
     int found_idx = -1;
     for (int j = 0; j < nf; j++) {
       if (fn_ag[j].is_user == ag[i].is_user &&
@@ -236,7 +238,8 @@ fn_top(int limit)
     }
     if (found_idx >= 0) {
       fn_ag[found_idx].count += ag[i].count;
-      fn_ag[found_idx].distinct_pcs++;
+      if (is_new_pc)
+        fn_ag[found_idx].distinct_pcs++;
     } else {
       strcpy(fn_ag[nf].name, sym_name);
       fn_ag[nf].is_user = ag[i].is_user;

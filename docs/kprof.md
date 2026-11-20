@@ -103,3 +103,26 @@ make kernel/kernel fs.img
 | KP12 | kiểm chứng hợp đồng giải mã symbol (`KPROF_CMD_SYM`): hai câu lệnh kế tiếp trong `kprof_spin` chênh đúng 4 byte offset; địa chỉ user/ngoài vùng trả về `found=0` |
 | KP13 | stress đồng thời 4 tiến trình gọi `START`/`STATUS`/`READ`/`SYM` khi đang lấy mẫu không race/deadlock |
 | KP14 | kiểm tra không rò rỉ bộ nhớ trang (`sbrk`) hoặc tài nguyên sau nhiều chu kỳ lấy mẫu + `fork`/`exit` |
+
+## Lệnh chạy lấy minh chứng nhanh theo từng tuần (Tuần 5 – Tuần 8)
+
+Mỗi tuần chỉ cần chạy **1 lệnh duy nhất** ở host để sinh đầy đủ log, bảng tổng hợp và màn hình kết quả chuẩn:
+
+| Tuần | Mục tiêu | Lệnh chạy 1 dòng | Output / Log |
+|---|---|---|---|
+| **Tuần 5 (Checkpoint)** | Demo hot-loop (`kbench kspin`, `cpu`, `sys`) + `kproftest` trên `CPUS=3,4` | `python3 scripts/tu_weekly_evidence.py week5` | `results/kprof/week5-checkpoint.log` |
+| **Tuần 6 (Stress)** | Lặp `10x` trên `CPUS=1` + `10x` trên `CPUS=4` (tổng 300 test cases) | `python3 scripts/tu_weekly_evidence.py week6` | `results/kprof-stress/summary.txt` |
+| **Tuần 7 (Benchmark)** | Đo overhead `stock` vs `prof-off` vs `prof-on` (`5x` mỗi điểm dữ liệu) | `python3 scripts/tu_weekly_evidence.py week7` | `results/kprof-bench/summary.csv` |
+| **Tuần 8 (Code Freeze)** | Clean build, `--verify` 0 symbol drift, SHA256, `kproftest` + `crash` | `python3 scripts/tu_weekly_evidence.py week8` | `results/kprof/week8-freeze.log` |
+
+Nếu muốn tự gõ demo trực tiếp trong shell QEMU (`make qemu CPUS=4`) tại buổi Checkpoint Tuần 5:
+
+```sh
+kprof reset
+kprof start
+kbench kspin 35
+kprof stop
+kprof status
+kprof fn 5
+kprof top 5
+```
